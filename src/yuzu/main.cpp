@@ -241,8 +241,10 @@ int main(int argc, char* argv[]) {
         qputenv("DISPLAY", ":0");
     }
 
-    if (GraphicsBackend::GetForceX11() && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
+    if (GraphicsBackend::GetForceX11()) {
+        // The user's explicit preference takes precedence over a launcher Wayland fallback list.
         qputenv("QT_QPA_PLATFORM", "xcb");
+    }
 
     // Fix the Wayland appId. This needs to match the name of the .desktop file without the .desktop
     // suffix.
