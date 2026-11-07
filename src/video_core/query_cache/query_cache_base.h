@@ -10,7 +10,6 @@
 #include <mutex>
 #include <optional>
 #include <span>
-#include "video_core/page_filter.h"
 #include "common/container/unordered_map.h"
 #include <utility>
 
@@ -42,9 +41,6 @@ class QueryCacheBase : public VideoCommon::ChannelSetupCaches<VideoCommon::Chann
     using RuntimeType = typename Traits::RuntimeType;
 
 public:
-    /// Device pages this cache ever registered objects on (InnerInvalidation skips the rest).
-    VideoCommon::PageFilter page_filter;
-
     union QueryLocation {
         BitField<27, 5, u32> stream_id;
         BitField<0, 27, u32> query_id;
@@ -67,19 +63,14 @@ public:
     }
 
     void FlushRegion(VAddr addr, std::size_t size) {
-        if (SemiFlushRegion(addr, size)) {
-            RequestGuestHostSync();
-        }
-    }
-
-    /// Writes out the finalized reports in the region. True when some still wait for host results.
-    bool SemiFlushRegion(VAddr addr, std::size_t size) {
         bool result = false;
         IterateCache<false>(addr, size, [this, &result](QueryLocation location) {
             result |= SemiFlushQueryDirty(location);
             return result;
         });
-        return result;
+        if (result) {
+            RequestGuestHostSync();
+        }
     }
 
     static u64 BuildMask(std::span<const QueryType> types) {
@@ -151,12 +142,10 @@ protected:
                 continue;
             }
             auto& contents = it->second;
-            bool matched = false;
             for (auto& query : contents) {
                 if (!in_range(query.first)) {
                     continue;
                 }
-                matched = true;
                 if constexpr (RETURNS_BOOL) {
                     if (func(query.second)) {
                         return;
@@ -165,11 +154,7 @@ protected:
                     func(query.second);
                 }
             }
-            // Only pages with a query in the range: the scan above already found none elsewhere.
             if constexpr (remove_from_cache) {
-                if (!matched) {
-                    continue;
-                }
                 const auto in_range2 = [&](const std::pair<u32, QueryLocation>& pair) {
                     return in_range(pair.first);
                 };

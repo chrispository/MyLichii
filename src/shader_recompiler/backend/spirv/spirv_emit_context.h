@@ -7,7 +7,6 @@
 #pragma once
 
 #include <array>
-#include <optional>
 
 #include <sirit/sirit.h>
 #include "common/container/unordered_set.h"
@@ -163,14 +162,6 @@ struct GenericElementInfo {
     u32 num_components{};
 };
 
-struct CooperativeHmmaTypes {
-    Id float16{};
-    Id float16x2{};
-    Id matrix_a{};
-    Id matrix_b{};
-    Id matrix_c{};
-};
-
 class EmitContext final : public Sirit::Module {
 public:
     explicit EmitContext(const Profile& profile, const RuntimeInfo& runtime_info,
@@ -222,8 +213,6 @@ public:
 
     const Profile& profile;
     const RuntimeInfo& runtime_info;
-    const bool requires_coherent_global_memory;
-    const bool requires_coherent_image_memory;
     Stage stage{};
 
     Id void_id{};
@@ -359,7 +348,6 @@ public:
         IAdd, SMin, UMin, SMax, UMax, Inc, Dec, And, Or, Xor, Exchange, AddF32, Count,
     };
     std::array<Id, static_cast<size_t>(GlobalAtomic::Count)> global_atomic_funcs{};
-    Id atomic_cas_global_func_u32{};
 
     bool need_input_position_indirect{};
     Id input_position{};
@@ -378,11 +366,6 @@ public:
     Id frag_depth{};
 
     std::array<Id, 2> software_matrix_functions{};
-    std::optional<CooperativeHmmaTypes> cooperative_hmma; ///< Set when a program lowers HMMA to it
-    /// Set when HMMA runs on 16x16x16 matrices: each 32-lane subgroup owns 384 words of shared
-    /// memory from this word (A, B and C/D tiles of 16x16 fp16, 128 words each).
-    std::optional<u32> tensor_scratch_word;
-    Id tensor_subgroup_id{};
     std::vector<Id> interfaces;
     std::vector<std::pair<u32, spv::Op>> opcode_rewrites;
 

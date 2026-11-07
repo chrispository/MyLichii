@@ -201,9 +201,6 @@ struct Values {
     Setting<bool, false> dump_audio_commands{
                                              linkage, false, "dump_audio_commands", Category::Audio, Specialization::Default, false};
 
-    Setting<u16, true> microphone_volume{linkage, 100, 0, 200, "microphone_volume",
-                                        Category::Controls};
-
     // Core
     SwitchableSetting<bool> use_multi_core{linkage, true, "use_multi_core", Category::Core};
     SwitchableSetting<MemoryLayout, true> memory_layout_mode{linkage,
@@ -360,18 +357,6 @@ struct Values {
                                                   true,
                                                   true};
 
-    // Lichii: caps how often the game's own compositor presents, so the game itself is paced to
-    // this rate instead of only the display. 0 keeps the game's vblank and swap interval.
-    SwitchableSetting<u32, true> fps_limit{linkage,
-                                           0,
-                                           0,
-                                           480,
-                                           "fps_limit",
-                                           Category::Renderer,
-                                           Specialization::Countable,
-                                           true,
-                                           true};
-
     SwitchableSetting<ScalingFilter> scaling_filter{linkage,
                                                     ScalingFilter::ScaleForce,
                                                     "scaling_filter",
@@ -379,10 +364,6 @@ struct Values {
                                                     Specialization::Default,
                                                     true,
                                                     true};
-    // A Switch 2 game's own DLSS network (translated) in place of AMD FSR 3.1, where it runs and
-    // its output passes the checks.
-    SwitchableSetting<bool> game_dlss_network{linkage, false, "game_dlss_network",
-                                              Category::Renderer};
     SwitchableSetting<int, true> fsr_sharpening_slider{linkage,
 #ifdef __ANDROID__
                                                        0,
@@ -620,24 +601,6 @@ struct Values {
         linkage, true, "use_vulkan_driver_pipeline_cache", Category::RendererAdvanced,
         Specialization::Default};
 
-    SwitchableSetting<NativeAsyncDraws> native_async_draws{linkage,
-                                                           NativeAsyncDraws::Wait,
-                                                           "native_async_draws",
-                                                           Category::RendererAdvanced,
-                                                           Specialization::Default,
-                                                           true,
-                                                           true};
-
-    SwitchableSetting<u32, true> native_pipeline_wait_ms{linkage,
-                                                         8,
-                                                         1,
-                                                         100,
-                                                         "native_pipeline_wait_ms",
-                                                         Category::RendererAdvanced,
-                                                         Specialization::Countable,
-                                                         true,
-                                                         true};
-
     SwitchableSetting<bool> enable_compute_pipelines{linkage, false, "enable_compute_pipelines",
                                                      Category::RendererAdvanced};
 
@@ -732,9 +695,6 @@ struct Values {
 
     SwitchableSetting<bool> gpu_unswizzle_enabled{linkage, false, "gpu_unswizzle_enabled",
                                                   Category::RendererHacks};
-
-    SwitchableSetting<bool> pin_gpu_threads{linkage, false, "pin_gpu_threads",
-                                            Category::RendererHacks};
 
     SwitchableSetting<ExtendedDynamicState> dyna_state{linkage,
 #if defined(__ANDROID__)

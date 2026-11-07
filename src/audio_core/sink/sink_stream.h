@@ -31,7 +31,6 @@ enum class StreamType {
     Render,
     Out,
     In,
-    Sysmix,
 };
 
 struct SinkBuffer {
@@ -79,16 +78,6 @@ public:
      * Stop the sink stream.
      */
     virtual void Stop() {}
-
-    virtual bool IsReady() const {
-        return false;
-    }
-
-    void MarkFaulted() {
-        failed = true;
-    }
-
-    virtual bool TryAppendOutputBlock(SinkBuffer& buffer, std::span<s16> samples);
 
     /**
      * Check if the stream is paused.
@@ -172,14 +161,6 @@ public:
     }
 
     /**
-     * Whether the host still has audio to play: queued buffers or the rest of the one playing.
-     * GetQueueSize drops to zero as soon as the last buffer starts, while its frames still play.
-     */
-    bool HasPendingAudio() const {
-        return samples_buffer.Size() != 0;
-    }
-
-    /**
      * Set the maximum buffer queue size.
      */
     void SetRingSize(u32 ring_size) {
@@ -202,9 +183,6 @@ public:
      */
     virtual std::vector<s16> ReleaseBuffer(u64 num_samples);
 
-    /// Read only captured frames, without padding missing host input with silence.
-    std::vector<s16> DrainInputSamples(u64 max_frames);
-
     /**
      * Empty out the buffer queue.
      */
@@ -217,19 +195,6 @@ public:
      * @param num_frames - Number of frames to be filled.
      */
     void ProcessAudioIn(std::span<const s16> input_buffer, std::size_t num_frames);
-
-    // Preview captures never feed guest buffers or depend on emulation timing.
-    void EnableInputPreview() {
-        input_preview = true;
-    }
-
-    void SetInputPreviewGain(float gain) {
-        input_preview_gain.store(gain);
-    }
-
-    u32 TakeInputPeak() {
-        return input_peak.exchange(0);
-    }
 
     /**
      * Callback for AudioOut and AudioRenderer.
@@ -268,16 +233,12 @@ protected:
     u32 device_channels{2};
     /// Is this stream currently paused?
     std::atomic<bool> paused{true};
-    std::atomic<bool> failed{};
     /// Name of this stream
     std::string name{};
 
 private:
     /// Ring buffer of the samples waiting to be played or consumed
     Common::RingBuffer<s16, 0x10000> samples_buffer;
-    bool input_preview{};
-    std::atomic<float> input_preview_gain{1.0f};
-    std::atomic<u32> input_peak{};
     /// Audio buffers queued and waiting to play
     Common::SPSCQueue<SinkBuffer, 0x10000> queue;
     /// The currently-playing audio buffer

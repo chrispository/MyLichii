@@ -30,7 +30,6 @@ DeviceSession::~DeviceSession() {
     Finalize();
 }
 
-/// Acquire the host stream and process reference, unwinding both if capture is unavailable.
 Result DeviceSession::Initialize(std::string_view name_, SampleFormat sample_format_,
                                  u16 channel_count_, size_t session_id_, Kernel::KProcess* handle_,
                                  u64 applet_resource_user_id_, Sink::StreamType type_) {
@@ -52,24 +51,15 @@ Result DeviceSession::Initialize(std::string_view name_, SampleFormat sample_for
         sink = &system.AudioCore().GetOutputSink();
     }
     stream = sink->AcquireSinkStream(system, channel_count, name, type);
-    if (type == Sink::StreamType::In && !stream->IsReady()) {
-        sink->CloseStream(stream);
-        stream = nullptr;
-        handle->Close(system.Kernel());
-        handle = nullptr;
-        return Service::Audio::ResultOperationFailed;
-    }
     initialized = true;
     return ResultSuccess;
 }
 
-/// Release the host stream and process reference, including after a failed initialization.
 void DeviceSession::Finalize() {
     if (initialized) {
         Stop();
         sink->CloseStream(stream);
         stream = nullptr;
-        initialized = false;
     }
 
     if (handle) {
@@ -78,18 +68,12 @@ void DeviceSession::Finalize() {
     }
 }
 
-/// Start the host stream before scheduling audio ticks; propagate input backend failures.
-Result DeviceSession::Start() {
+void DeviceSession::Start() {
     if (stream) {
         stream->Start();
-        if (type == Sink::StreamType::In && !stream->IsReady()) {
-            return Service::Audio::ResultOperationFailed;
-        }
         system.CoreTiming().ScheduleLoopingEvent(std::chrono::nanoseconds::zero(), INCREMENT_TIME,
                                                  thread_event);
-        return ResultSuccess;
     }
-    return Service::Audio::ResultOperationFailed;
 }
 
 void DeviceSession::Stop() {
@@ -125,11 +109,9 @@ void DeviceSession::AppendBuffers(std::span<const AudioBuffer> buffers) {
     }
 }
 
-/// Copy captured PCM to the guest, padding short or odd-sized buffers with silence.
 void DeviceSession::ReleaseBuffer(const AudioBuffer& buffer) const {
     if (type == Sink::StreamType::In) {
         auto samples{stream->ReleaseBuffer(buffer.size / sizeof(s16))};
-        samples.resize(buffer.size / sizeof(s16) + (buffer.size % sizeof(s16) != 0), 0);
         handle->GetMemory().WriteBlockUnsafe(buffer.samples, samples.data(), buffer.size);
     }
 }

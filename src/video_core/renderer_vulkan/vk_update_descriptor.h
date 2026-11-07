@@ -60,10 +60,6 @@ public:
         return upload_start;
     }
 
-    size_t UpdateCount() const noexcept {
-        return upload_start ? static_cast<size_t>(payload_cursor - upload_start) : 0;
-    }
-
     void AddSampledImage(VkImageView image_view, VkSampler sampler) {
         *(payload_cursor++) = VkDescriptorImageInfo{
             .sampler = sampler,
@@ -120,8 +116,7 @@ public:
 
 private:
     const Device& device;
-    size_t frame_payload_size;
-    const size_t maximum_frame_payload_size;
+    const size_t frame_payload_size;
     const bool supports_descriptor_buffer;
     bool use_descriptor_buffer{false};
     size_t frame_index{0};
@@ -129,8 +124,6 @@ private:
     DescriptorUpdateEntry* payload_start = nullptr;
     const DescriptorUpdateEntry* upload_start = nullptr;
     std::unique_ptr<DescriptorUpdateEntry[]> payload;
-    bool growth_disabled{};
-    bool fallback_reported{};
 };
 
 // TODO: should these be separate classes instead?

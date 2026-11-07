@@ -88,7 +88,7 @@ public:
     /**
      * Start this device session, starting the backend stream.
      */
-    Result Start();
+    void Start();
 
     /**
      * Stop this device session, stopping the backend stream.

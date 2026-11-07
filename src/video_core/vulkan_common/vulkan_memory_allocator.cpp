@@ -208,22 +208,6 @@ MemoryAllocator::~MemoryAllocator() = default;
 
 vk::Image MemoryAllocator::CreateImage(const VkImageCreateInfo &ci, bool dedicated) const
 {
-    vk::Image image;
-    vk::Check(AllocateImage(ci, dedicated, image));
-    return image;
-}
-
-vk::Image MemoryAllocator::TryCreateImage(const VkImageCreateInfo &ci, bool dedicated) const {
-    vk::Image image;
-    const VkResult result = AllocateImage(ci, dedicated, image);
-    if (result != VK_ERROR_OUT_OF_DEVICE_MEMORY && result != VK_ERROR_OUT_OF_HOST_MEMORY) {
-        vk::Check(result);
-    }
-    return image;
-}
-
-VkResult MemoryAllocator::AllocateImage(const VkImageCreateInfo &ci, bool dedicated,
-                                        vk::Image &image) const {
     const VmaAllocationCreateInfo alloc_ci = {
             // Best fit: images freed by the thousand leave holes in the blocks, which new ones
             // should fill before VMA takes another block.
@@ -296,20 +280,15 @@ VkResult MemoryAllocator::AllocateImage(const VkImageCreateInfo &ci, bool dedica
                         "unbacked sparse image",
                         ci.extent.width, ci.extent.height, ci.extent.depth, ci.mipLevels,
                         ci.arrayLayers, static_cast<u32>(ci.format));
-            image = std::move(sparse);
-            return VK_SUCCESS;
+            return sparse;
         }
     }
     if (result != VK_SUCCESS) {
-        failed_images.fetch_add(1, std::memory_order_relaxed);
-        static u32 failed_logged{};
-        if (failed_logged++ < 32) {
-            LOG_ERROR(Render_Vulkan, "Image {}x{}x{} ({} levels, {} layers, format {}) failed: {}",
-                      ci.extent.width, ci.extent.height, ci.extent.depth, ci.mipLevels,
-                      ci.arrayLayers, static_cast<u32>(ci.format), static_cast<int>(result));
-        }
-        return result;
+        LOG_CRITICAL(Render_Vulkan, "Image {}x{}x{} ({} levels, {} layers, format {}) failed: {}",
+                     ci.extent.width, ci.extent.height, ci.extent.depth, ci.mipLevels,
+                     ci.arrayLayers, static_cast<u32>(ci.format), static_cast<int>(result));
     }
+    vk::Check(result);
 
     // Log GPU memory allocation for images
     if (GPU::Logging::IsActive() &&
@@ -321,9 +300,8 @@ VkResult MemoryAllocator::AllocateImage(const VkImageCreateInfo &ci, bool dedica
         );
     }
 
-    image = vk::Image(handle, ci.usage, *device.GetLogical(), allocator, allocation,
-                      device.GetDispatchLoader());
-    return VK_SUCCESS;
+    return vk::Image(handle, ci.usage, *device.GetLogical(), allocator, allocation,
+                        device.GetDispatchLoader());
 }
 
 vk::Image MemoryAllocator::CreateUnbackedImage(const VkImageCreateInfo &ci, bool aliased) const {

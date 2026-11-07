@@ -218,6 +218,9 @@ static bool VectorViewIsExact(EmitContext& ctx, const IR::Value& offset, u32 siz
     if (!ctx.profile.support_descriptor_aliasing) {
         return false;
     }
+    if (!SsboAlignFixEnabled()) {
+        return true;
+    }
     if (offset.IsImmediate()) {
         return offset.U32() % size == 0;
     }

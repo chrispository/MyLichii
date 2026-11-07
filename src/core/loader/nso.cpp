@@ -19,7 +19,6 @@
 #include "common/settings.h"
 #include "common/swap.h"
 #include "core/core.h"
-#include "core/arm/dynarmic/window_trace.h"
 #include "core/file_sys/patch_manager.h"
 #include "core/hle/kernel/code_set.h"
 #include "core/hle/kernel/k_page_table.h"
@@ -108,35 +107,22 @@ std::optional<VAddr> AppLoader_NSO::LoadModule(Kernel::KProcess& process, Core::
         for (std::size_t i = 0; i < nso_header.segments.size(); ++i) {
             nso_file.Read(compressed_data.data(), nso_header.segments_compressed_size[i], nso_header.segments[i].offset);
             if (nso_header.IsSegmentCompressed(i)) {
-                const u32 segment_size = nso_header.segments[i].size;
                 if (nso_header.IsZBICCompressed()) {
                     // ZBIC compression
                     const int r = Common::Compression::DecompressDataZBIC(
-                        std::span<u8>{decompressed_size}.first(segment_size),
+                        std::span<u8>{decompressed_size}.first(nso_header.segments[i].size),
                         std::span<const u8>{compressed_data}.first(nso_header.segments_compressed_size[i])
                     );
-                    // A failed segment would leave the previous segment's bytes in the buffer and
-                    // boot a corrupt image that hangs without presenting; refuse to load instead.
-                    if (r <= 0) {
-                        LOG_ERROR(Loader, "{}: segment {} failed ZBIC decompression",
-                                  nso_file.GetName(), i);
-                        return std::nullopt;
-                    }
-                    if (static_cast<u32>(r) != segment_size) {
-                        LOG_WARNING(Loader, "{}: segment {} decompressed to {:#x} of {:#x} bytes",
-                                    nso_file.GetName(), i, r, segment_size);
-                        std::fill(decompressed_size.begin() + r,
-                                  decompressed_size.begin() + segment_size, u8{0});
-                    }
+                    ASSERT(r > 0);
                 } else {
                     // LZ4 compression
                     int r = Common::Compression::DecompressDataLZ4(
                         decompressed_size.data(),
-                        segment_size,
+                        nso_header.segments[i].size,
                         compressed_data.data(),
                         nso_header.segments_compressed_size[i]
                     );
-                    ASSERT(r == int(segment_size));
+                    ASSERT(r == int(nso_header.segments[i].size));
                 }
 
                 std::memcpy(
@@ -355,18 +341,6 @@ std::optional<VAddr> AppLoader_NSO::LoadModule(Kernel::KProcess& process, Core::
     }
 
     // Load codeset for current process
-    if (name == "sdk") {
-        const bool matching_sdk =
-            Core::WindowTrace::Enabled() && process.GetProgramId() == Core::WindowTrace::ProgramId &&
-            Common::HexToString(std::span{nso_header.build_id}.first(20)) ==
-                "41D4DE4A3B78214AD20C896960DF0E5EA0ED595F";
-        Core::WindowTrace::sessions.Reset(&process, matching_sdk ? load_base : 0);
-        if (Core::WindowTrace::Enabled()) {
-            const auto session = Core::WindowTrace::sessions.Find(&process);
-            LOG_INFO(Loader, "Star Fox window trace: matching SDK={} base={:#x} session={}",
-                     matching_sdk, matching_sdk ? load_base : 0, session ? session->id : 0);
-        }
-    }
     LOG_INFO(Loader, "Module {} loaded at {:#x} (size {:#x})", nso_file.GetName(), load_base, image_size);
     process.LoadModule(system.Kernel(), std::move(codeset), load_base);
     if (name == "main" && process.GetProgramId() == Settings::MarioKartWorldProgramId) {

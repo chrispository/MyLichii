@@ -188,10 +188,6 @@ bool Swapchain::AcquireNextImage(bool may_flush) {
         LOG_ERROR(Render_Vulkan, "vkAcquireNextImageKHR returned {}", string_VkResult(result));
         break;
     }
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        // No image was acquired, so image_index is stale: the caller recreates and tries again.
-        return true;
-    }
 
     const auto wait_with_frame_pacing = [this, may_flush] {
     switch (Settings::values.frame_pacing_mode.GetValue()) {
@@ -226,8 +222,8 @@ bool Swapchain::AcquireNextImage(bool may_flush) {
     resource_ticks[image_index] = scheduler.CurrentTick();
 
     // A suboptimal acquire still acquired an image and signals its semaphore: present it, and let
-    // NeedsRecreation() recreate at the next frame.
-    return false;
+    // NeedsRecreation() recreate at the next frame. Out of date acquired nothing.
+    return is_outdated;
 }
 
 void Swapchain::Present(VkSemaphore render_semaphore) {

@@ -31,13 +31,19 @@ Users report game bugs with Lichii logs (`eden_log.txt`, `eden_log.txt.old`). Ea
 
 Add ids here when a report identifies a new game.
 
+## Syncing MyLichii
+
+MyLichii follows Eglantine's `upstream/nx2-experimental`; `origin/nx2` is our fork branch. Fetch both before syncing, then bring the experimental branch into `nx2`. For conflicts, prefer the experimental implementation; retain MyLichii branding and intentional fork changes.
+
+Keep the pipeline-cache behavior in `src/video_core/renderer_vulkan/vk_pipeline_cache.cpp`: desktop pipeline workers default to 8 (`EDEN_NX2_PIPELINE_WORKERS` overrides this), and NVIDIA uses MyLichii's saved cache unless `EDEN_NX2_DRIVER_PIPELINE_CACHE` opts into the driver cache. Check whether upstream has equivalent behavior before reapplying it. Build MyLichii, then push the synced `nx2` branch to `origin`.
+
 ## Before writing a fix
 
 Lichii is a fork of [Eglantine](https://github.com/Djihads80/Eglantine). Do not guess, and do not rewrite a fix upstream already has.
 
 1. `git remote add upstream https://github.com/Djihads80/Eglantine.git && git fetch upstream`.
-2. Check `upstream/nx2`, open and closed PRs, unmerged branches, and issues for the game and symptom (`gh pr list -R Djihads80/Eglantine --state all`, `gh issue list -R Djihads80/Eglantine --state all`, `gh pr diff <n>`). Read the diffs, not only the titles.
-3. If nx2 is behind `upstream/nx2`, merge upstream first. Port an existing upstream fix before writing a new one, and cite its PR or commit.
+2. Check `upstream/nx2-experimental` and `upstream/nx2`, open and closed PRs, unmerged branches, and issues for the game and symptom (`gh pr list -R Djihads80/Eglantine --state all`, `gh issue list -R Djihads80/Eglantine --state all`, `gh pr diff <n>`). Read the diffs, not only the titles.
+3. If nx2 is behind `upstream/nx2-experimental`, sync the experimental branch first. Port an existing upstream fix before writing a new one, and cite its PR or commit.
 4. Write a new fix only when nothing upstream addresses the root cause the log shows.
 
 ## Live debug server
