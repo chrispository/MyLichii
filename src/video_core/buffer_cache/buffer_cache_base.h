@@ -143,7 +143,7 @@ public:
     Binding indirect_buffer_binding;
 
     std::array<Binding, NUM_COMPUTE_UNIFORM_BUFFERS> compute_uniform_buffers;
-    std::array<Binding, NUM_STORAGE_BUFFERS> compute_storage_buffers;
+    std::array<Binding, NUM_COMPUTE_STORAGE_BUFFERS> compute_storage_buffers;
     std::array<TextureBufferBinding, NUM_TEXTURE_BUFFERS> compute_texture_buffers;
 
     std::array<u32, NUM_STAGES> enabled_uniform_buffer_masks{};

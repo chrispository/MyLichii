@@ -133,9 +133,14 @@ public:
 
     [[nodiscard]] GraphicsPipeline* CurrentGraphicsPipeline();
 
+    /// Why the last CurrentGraphicsPipeline() returned null (diagnostics).
+    [[nodiscard]] const char* GraphicsMissReason() const noexcept {
+        return graphics_miss;
+    }
+
     void TickFrame();
 
-    [[nodiscard]] ComputePipeline* CurrentComputePipeline();
+    [[nodiscard]] ComputePipeline* CurrentComputePipeline(u64& native_key);
 
     void LoadDiskResources(u64 title_id, std::stop_token stop_loading,
                            const VideoCore::DiskResourceLoadCallback& callback);
@@ -193,6 +198,7 @@ private:
 
     GraphicsPipelineCacheKey graphics_key{};
     GraphicsPipeline* current_pipeline{};
+    mutable const char* graphics_miss{"no-pipeline"};
 
     /// Destroys graphics pipelines unused for a while, once the GPU is done with them.
     void EvictUnusedPipelines();
@@ -218,6 +224,8 @@ private:
     Shader::HostTranslateInfo host_info;
 
     std::filesystem::path pipeline_cache_filename;
+    /// Task and mesh pipelines, with the mesh state they are translated with.
+    std::filesystem::path mesh_pipeline_cache_filename;
 
     /// Key hashes of the graphics pipelines in the disk cache. Only those a recent session used
     /// (used_pipelines) are built at boot; the rest are built when first needed, and not stored

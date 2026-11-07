@@ -82,7 +82,27 @@ void GpuSplit::CheckOwner(const char* where) {
     LOG_ERROR(HW_GPU, "GPU split owner check: {} on thread {} while the back runs; stack:{}",
               where, thread, stack);
 #else
-    (void)where;
+    // Also while the back is idle: its idle hook submits (Scheduler::FlushDeferred).
+    if (on_back_thread || !instance.back_running.load(std::memory_order_acquire)) {
+        return;
+    }
+    static std::atomic<u32> reports{};
+    if (reports.fetch_add(1) >= 12) {
+        return;
+    }
+    std::string stack;
+#ifdef __GLIBC__
+    void* frames[40];
+    const int count = backtrace(frames, 40);
+    if (char** const symbols = backtrace_symbols(frames, count)) {
+        for (int i = 1; i < count; ++i) {
+            stack += fmt::format("\n  {}", symbols[i]);
+        }
+        std::free(symbols);
+    }
+#endif
+    LOG_ERROR(HW_GPU, "GPU split owner check: {} on a thread other than the back; stack:{}", where,
+              stack);
 #endif
 }
 
@@ -201,7 +221,7 @@ void GpuSplit::Publish() {
 
 void GpuSplit::Drain(DrainSite site) {
     consumed_cache = consumed.load(std::memory_order_acquire);
-    if (consumed_cache == write_position) {
+    if (consumed_cache == write_position && BackQuiet()) {
         return;
     }
     Publish();
@@ -432,9 +452,16 @@ void GpuSplit::BackLoop(std::stop_token stop_token) {
                 Pause();
                 available = published.load(std::memory_order_acquire);
             }
-            if (available == read_position && idle_hook != nullptr) {
+            if (available == read_position) {
                 hook_requested.store(false, std::memory_order_seq_cst);
-                idle_hook(idle_argument);
+                // The front may already see everything consumed: Drain() waits for back_quiet
+                // too, so the deferred submit can't overlap whatever the front does next.
+                if (!back_quiet.load(std::memory_order_relaxed)) {
+                    if (idle_hook != nullptr) {
+                        idle_hook(idle_argument);
+                    }
+                    back_quiet.store(true, std::memory_order_release);
+                }
                 available = published.load(std::memory_order_acquire);
             }
             if (available == read_position) {

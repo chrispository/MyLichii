@@ -23,8 +23,9 @@
 #include <fmt/format.h>
 
 #include <windows.h>
-#include <tlhelp32.h>
+// windows.h first: the other two use its types.
 #include <dbghelp.h>
+#include <tlhelp32.h>
 
 namespace Nx2Sampler {
 namespace {
@@ -127,8 +128,7 @@ std::vector<Target> FindThreads(const std::vector<std::string>& patterns) {
         std::string name;
         if (SUCCEEDED(get_description(handle, &wide)) && wide != nullptr) {
             char buffer[256]{};
-            WideCharToMultiByte(CP_UTF8, 0, wide, -1, buffer, sizeof(buffer) - 1, nullptr,
-                                nullptr);
+            WideCharToMultiByte(CP_UTF8, 0, wide, -1, buffer, sizeof(buffer) - 1, nullptr, nullptr);
             name = buffer;
             LocalFree(wide);
         }
@@ -158,7 +158,8 @@ unsigned Walk(CONTEXT context, std::array<DWORD64, MaxDepth>& frames, const NT_T
     while (depth < MaxDepth && context.Rip != 0 && on_stack(context.Rsp)) {
         frames[depth++] = context.Rip;
         DWORD64 image_base{};
-        const PRUNTIME_FUNCTION function = RtlLookupFunctionEntry(context.Rip, &image_base, nullptr);
+        const PRUNTIME_FUNCTION function =
+            RtlLookupFunctionEntry(context.Rip, &image_base, nullptr);
         if (function == nullptr) {
             // A leaf function (no unwind data): its return address is on top of the stack. JIT
             // code has none either; past the first frame, stop there.

@@ -404,6 +404,16 @@ GraphicsPipeline::GraphicsPipeline(
     build.emplace(worker_thread, std::move(func));
 }
 
+void GraphicsPipeline::RunBuild() {
+    // A draw or dispatch that needs the pipeline builds it on the scheduler thread instead of
+    // waiting for the worker queue, which can hold hundreds of builds, to reach it.
+    if (build_claimed.exchange(true)) {
+        return;
+    }
+    build_task();
+    build_task = nullptr;
+}
+
 void GraphicsPipeline::AddTransition(GraphicsPipeline* transition) {
     transition_keys.push_back(transition->key);
     transitions.push_back(transition);

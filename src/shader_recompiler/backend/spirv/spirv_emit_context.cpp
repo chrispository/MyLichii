@@ -8,6 +8,8 @@
 #include <array>
 #include <bit>
 #include <climits>
+#include <optional>
+#include <span>
 
 #include <boost/container/static_vector.hpp>
 
@@ -15,10 +17,12 @@
 
 #include "common/common_types.h"
 #include "common/div_ceil.h"
+#include "common/env_gate.h"
 #include "shader_recompiler/backend/nvn_storage_descriptor.h"
 #include "shader_recompiler/backend/spirv/emit_spirv.h"
 #include "shader_recompiler/backend/spirv/emit_spirv_instructions.h"
 #include "shader_recompiler/backend/spirv/spirv_emit_context.h"
+#include "shader_recompiler/backend/spirv/ssbo_align_gate.h"
 
 namespace Shader::Backend::SPIRV {
 namespace {
@@ -375,6 +379,13 @@ Id CasFunction(EmitContext& ctx, Operation operation, Id value_type) {
     ctx.OpReturnValue(result);
     ctx.OpFunctionEnd();
     return func;
+}
+
+// A/B gate: with EGLANTINE_CAS_RETRY_FIX=0 each retry reloads the word instead of reusing the
+// compare-exchange result.
+bool CasRetryFix() {
+    static const bool enabled{Common::EnvGate("EGLANTINE_CAS_RETRY_FIX")};
+    return enabled;
 }
 
 Id CasLoop(EmitContext& ctx, Operation operation, Id array_pointer, Id element_pointer,
