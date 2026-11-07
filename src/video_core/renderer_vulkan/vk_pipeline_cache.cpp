@@ -8,6 +8,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -400,7 +401,12 @@ size_t GetTotalPipelineWorkers() {
     }
     return std::min(max_core_threads, desired);
 #else
-    return max_core_threads;
+    // EDEN_NX2_PIPELINE_WORKERS overrides the desktop default of 8. Leave room for emulation
+    // threads and the driver's own compiler threads during a pipeline burst.
+    const char* value = std::getenv("EDEN_NX2_PIPELINE_WORKERS");
+    const int configured = value ? std::atoi(value) : 8;
+    const size_t desired = static_cast<size_t>(std::clamp(configured, 1, 64));
+    return std::min(max_core_threads, desired);
 #endif
 }
 
@@ -430,13 +436,16 @@ bool GraphicsPipelineCacheKey::operator==(const GraphicsPipelineCacheKey& rhs) c
 }
 
 namespace {
-// NVIDIA's and AMD's drivers keep a disk cache of built pipelines of their own. Eden's copy on top
-// only kept every pipeline the title ever built in host memory (title 1: a 245 MB file, ~0.35 GB
+// NVIDIA and AMD drivers may keep their own disk cache of built pipelines. Eden's extra cache
+// held every pipeline the title ever built in host memory (title 1: a 245 MB file, ~0.35 GB
 // of RAM for the session) and copied it whole at each save, which stalled frames; pipelines built
 // no slower without it.
 bool DriverCachesPipelines(const Device& device) {
     switch (device.GetDriverID()) {
     case VK_DRIVER_ID_NVIDIA_PROPRIETARY:
+        // Some NVIDIA installations do not persist Vulkan pipelines in their driver cache.
+        // Keep MyLichii's cache unless the old driver-cache behavior is explicitly requested.
+        return std::getenv("EDEN_NX2_DRIVER_PIPELINE_CACHE") != nullptr;
     case VK_DRIVER_ID_AMD_PROPRIETARY:
         return true;
     default:
